@@ -1,35 +1,32 @@
+// app/api/candle/route.js
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { connectToDatabase } from "../../../lib/mongo";
 
-const FILE_PATH = path.join(process.cwd(), "data", "candles.json");
-
-// Helper function to read the candle count
-const getCandleCount = () => {
-    try {
-        const data = fs.readFileSync(FILE_PATH, "utf-8");
-        return JSON.parse(data).candleCount || 0;
-    } catch (error) {
-        return 0;
-    }
+// Helper function to get the candle count from the database
+const getCandleCount = async (db) => {
+    const collection = db.collection('candles');
+    const candle = await collection.findOne({});
+    return candle ? candle.candleCount : 0;
 };
 
-// Helper function to update the candle count
-const updateCandleCount = (count) => {
-    const data = { candleCount: count };
-    fs.writeFileSync(FILE_PATH, JSON.stringify(data));
+// Helper function to update the candle count in the database
+const updateCandleCount = async (db, count) => {
+    const collection = db.collection('candles');
+    await collection.updateOne({}, { $set: { candleCount: count } }, { upsert: true });
 };
 
 // GET: Fetch the current candle count
 export async function GET() {
-    const candleCount = getCandleCount();
+    const db = await connectToDatabase();
+    const candleCount = await getCandleCount(db);
     return NextResponse.json({ candleCount });
 }
 
 // POST: Increment the candle count
 export async function POST() {
-    let candleCount = getCandleCount();
+    const db = await connectToDatabase();
+    let candleCount = await getCandleCount(db);
     candleCount++;
-    updateCandleCount(candleCount);
+    await updateCandleCount(db, candleCount);
     return NextResponse.json({ candleCount });
 }
